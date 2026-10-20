@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Back to the Office</title>
+<meta name="description" content="An interactive 3D map of London showing how many days a week major tech and finance employers require staff in the office. Every policy sourced and dated.">
+<meta property="og:title" content="Back to the Office — London RTO map">
+<meta property="og:description" content="How many days a week do London's biggest tech and finance employers want you in? A sourced, 3D map.">
+<meta property="og:image" content="https://arikhanacademic-cpu.github.io/back-to-the-office/assets/og.png">
+<link rel="canonical" href="https://arikhanacademic-cpu.github.io/back-to-the-office/">
+<meta property="og:url" content="https://arikhanacademic-cpu.github.io/back-to-the-office/">
+<meta name="theme-color" content="#06080f">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="gl" aria-label="3D map of London offices coloured by return-to-office policy"></canvas>
+<div id="vignette"></div>
+<div id="labels" aria-hidden="true"></div>
+<div id="tip" role="tooltip"></div>
+
+<!-- ───────── TITLE SCREEN ───────── -->
+<section id="title" class="show">
+  <div class="t-kicker"><span class="t-dot"></span>London · Return-to-office tracker · <span class="mono" data-asof></span></div>
+  <h1 class="t-h1" aria-label="Back to the Office">
+    <span class="t-line"><span>Back</span> <span>to</span> <span>the</span></span>
+    <span class="t-line big"><span>Office</span></span>
+  </h1>
+  <p class="t-sub">How many days a week do London's biggest tech and finance employers want you at your desk? Every policy sourced and dated. Unconfirmed policies are shown in grey.</p>
+  <div class="t-stats" id="tStats"></div>
+  <div class="t-cta">
+    <button class="btn primary" id="btnPlayIntro"><span class="ico">▶</span> Play the week</button>
+    <button class="btn" id="btnExplore">Explore the map</button>
+  </div>
+  <div class="t-legend" id="tLegend"></div>
+</section>
+
+<!-- ───────── HUD ───────── -->
+<header id="hud-top" class="hud">
+  <div class="brand">
+    <div class="brand-mark"><i></i><i></i><i></i></div>
+    <div><div class="brand-name">Back to the Office</div><div class="brand-sub mono">London RTO map · as of <span data-asof></span></div></div>
+  </div>
+  <nav class="top-actions">
+    <button class="chip-btn" id="btnPlay" aria-pressed="false"><span class="ico">▶</span><span class="lbl">Play week</span></button>
+    <button class="chip-btn" id="btnSources">Sources</button>
+    <button class="chip-btn icon" id="btnPanel" aria-label="Filters and counts">☰</button>
+  </nav>
+</header>
+
+<aside id="panel" class="hud">
+  <div class="p-tabs" role="tablist">
+    <button role="tab" class="on" data-tab="filters">Filter</button>
+    <button role="tab" data-tab="areas">Areas</button>
+    <button role="tab" data-tab="list">Offices</button>
+  </div>
+  <div class="p-count" id="pCount"></div>
+  <div class="p-body" data-pane="filters">
+    <label class="toggle"><input type="checkbox" id="fWfh"><span class="sw"></span><span>Where could I work <b>3+ days from home</b>?</span></label>
+    <p class="hint mono">Shows employers whose confirmed minimum is 2 days or fewer.</p>
+    <div class="f-label">Industry</div>
+    <div class="chips" id="fIndustry"></div>
+    <div class="f-label">Area</div>
+    <div class="chips" id="fArea"></div>
+    <button class="link-btn" id="fReset">Reset filters</button>
+  </div>
+  <div class="p-body" data-pane="areas" hidden><div id="areaTable"></div></div>
+  <div class="p-body" data-pane="list" hidden><div id="officeList"></div></div>
+</aside>
+
+<div id="camBar" class="hud">
+  <button data-cam="overview">Overview</button>
+  <button data-cam="city">The City</button>
+  <button data-cam="wharf">Canary Wharf</button>
+  <button data-cam="kx">King's Cross</button>
+  <button data-cam="west">West End</button>
+</div>
+
+<footer id="timeline" class="hud">
+  <div class="tl-clock"><span id="tlDay">WED</span><span id="tlTime" class="mono">10:00</span></div>
+  <div class="tl-track" id="tlTrack">
+    <div class="tl-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span></div>
+    <div class="tl-fill" id="tlFill"></div>
+    <div class="tl-head" id="tlHead"></div>
+  </div>
+  <div class="tl-note mono">Lights are illustrative, modelled from each policy, not measured footfall.</div>
+</footer>
+
+<div id="ticker" class="hud"><div class="tk-label">Policy changes</div><div class="tk-viewport"><div class="tk-run" id="tkRun"></div></div></div>
+
+<!-- F1-style explainer card -->
+<article id="card" aria-live="polite"></article>
+<!-- Lower third (used by the timelapse) -->
+<div id="lower3"></div>
+
+<!-- Sources -->
+<section id="sources" hidden>
+  <div class="s-wrap">
+    <header class="s-head">
+      <div><div class="s-kicker mono">Methodology &amp; sources · as of <span data-asof></span></div><h2>Sources</h2></div>
+      <button class="chip-btn" id="btnCloseSources">Close ✕</button>
+    </header>
+    <div class="s-method">
+      <div><h3>Categories</h3><p><b class="c-remote">Teal</b> remote-friendly: no fixed minimum, or 0–1 days. <b class="c-hybrid">Amber</b> hybrid: 2–3 days. <b class="c-office">Red</b> office-first: 4–5 days. <b class="c-unconfirmed">Grey</b> not confirmed: we found no reputable public source for the London policy.</p></div>
+      <div><h3>Scope</h3><p>"Company-wide" means the source describes a firm-wide policy and we found no reported London exception. Where reporting covered US staff only, the London policy is marked <b>not confirmed</b>.</p></div>
+      <div><h3>Estimates</h3><p>Office locations are approximate, at building level. Building heights are stylised. The Monday-to-Friday lights and commuter trails are an <b>illustrative model</b> based on each policy, not measured occupancy or TfL data.</p></div>
+      <div><h3>Limits</h3><p>Web search was unavailable when this edition was compiled. Policies come only from pages we could open: official memos and careers pages, and reputable outlets. Anything else is grey. Summaries are paraphrased, with no direct quotes. Corrections are welcome.</p></div>
+    </div>
+    <div class="s-table" id="sTable"></div>
+  </div>
+</section>
+
+<div id="loader"><div class="ld-bar"><i></i></div><div class="mono">Building London…</div></div>
+<noscript><p style="padding:2rem;color:#fff">This map needs JavaScript and WebGL.</p></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
